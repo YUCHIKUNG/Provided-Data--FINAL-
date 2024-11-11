@@ -10,10 +10,21 @@ def load_and_combine_csvs(csv_path_pattern='*.csv'):
         raise FileNotFoundError("No CSV files found with the given pattern.")
     
     # Read and combine all CSV files into one DataFrame
-    df_list = [pd.read_csv(file) for file in csv_files]
+    df_list = []
+    for file in csv_files:
+        try:
+            df_list.append(pd.read_csv(file, encoding='ISO-8859-1'))  # Specify encoding here
+        except UnicodeDecodeError as e:
+            print(f"Error reading file {file}: {e}")
+            continue
+    
+    if not df_list:
+        raise ValueError("No files were successfully read.")
+    
     combined_df = pd.concat(df_list, ignore_index=True)
     
     return combined_df
+
 
 # Function to preprocess the DataFrame
 def preprocess_data(df):
@@ -36,8 +47,8 @@ def preprocess_data(df):
     df['Month Name'] = df['Sent Date'].dt.month_name()
     df['Hour of Day'] = df['Sent Date'].dt.hour
     
-    # Define cheese categories based on the Modifier column
-    df['Cheese Category'] = df['Modifier'].apply(lambda modifier: 'Cheddar' if 'Cheddar' in modifier else 
+    # Define cheese categories based on the Modifier column (handle missing values)
+    df['Cheese Category'] = df['Modifier'].fillna('').apply(lambda modifier: 'Cheddar' if 'Cheddar' in modifier else 
                                                  'Pepper Jack' if 'Pepper Jack' in modifier else 
                                                  'Alfredo' if 'Alfredo' in modifier else 'Other')
 
@@ -62,8 +73,8 @@ modifier_prices = {
 
 # Function to calculate cost-related columns
 def calculate_costs(df):
-    # Add the cost of the Parent Menu Selection
-    df['Base Cost'] = df['Parent Menu Selection'].map(menu_prices)
+    # Add the cost of the Parent Menu Selection, handle missing menu item cases
+    df['Base Cost'] = df['Parent Menu Selection'].map(menu_prices).fillna(0)
 
     # Add the cost for the Modifier, if it exists
     df['Modifier Cost'] = df['Modifier'].map(modifier_prices).fillna(0)
